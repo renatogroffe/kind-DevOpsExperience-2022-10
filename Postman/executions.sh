@@ -1,0 +1,1 @@
+newman run ChamadosSuporteMongoDB.postman_collection.json -n 10

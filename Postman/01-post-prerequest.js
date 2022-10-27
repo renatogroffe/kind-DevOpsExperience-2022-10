@@ -1,0 +1,2 @@
+pm.collectionVariables.set("email", pm.variables.replaceIn('{{$randomEmail}}'));    
+pm.collectionVariables.set("descritivoRequisicao", "Exemplo de descricao de chamado " + pm.variables.replaceIn('{{$guid}}'));

@@ -1,0 +1,170 @@
+{
+	"info": {
+		"_postman_id": "ddecadf2-51dc-467c-ab65-656ef3a730f0",
+		"name": "ChamadosSuporteMongoDB",
+		"schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+		"_exporter_id": "4157995"
+	},
+	"item": [
+		{
+			"name": "Cadastrar Chamado",
+			"event": [
+				{
+					"listen": "prerequest",
+					"script": {
+						"exec": [
+							"pm.collectionVariables.set(\"email\", pm.variables.replaceIn('{{$randomEmail}}'));    \r",
+							"pm.collectionVariables.set(\"descritivoRequisicao\", \"Exemplo de descricao de chamado \" + pm.variables.replaceIn('{{$guid}}'));"
+						],
+						"type": "text/javascript"
+					}
+				},
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Retorno OK Cadastrar Chamado\", function() {\r",
+							"    pm.response.to.be.ok;\r",
+							"    pm.response.to.json;\r",
+							"    pm.response.to.be.withBody;\r",
+							"});\r",
+							"\r",
+							"var result = pm.response.json();\r",
+							"\r",
+							"pm.test(\"Verificar se o Id do Chamado foi gerado\", function() {\r",
+							"    pm.expect(result.idChamado).not.undefined;\r",
+							"    pm.expect(result.idChamado).not.null;\r",
+							"    pm.collectionVariables.set(\"idChamado\", result.idChamado)\r",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "POST",
+				"header": [],
+				"body": {
+					"mode": "raw",
+					"raw": "{\r\n    \"email\": \"{{email}}\",\r\n    \"descritivoRequisicao\": \"{{descritivoRequisicao}}\"\r\n}",
+					"options": {
+						"raw": {
+							"language": "json"
+						}
+					}
+				},
+				"url": {
+					"raw": "http://localhost:5000/Suporte",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"Suporte"
+					]
+				}
+			},
+			"response": []
+		},
+		{
+			"name": "Consultar Chamado",
+			"event": [
+				{
+					"listen": "test",
+					"script": {
+						"exec": [
+							"pm.test(\"Retorno OK Consultar Chamado\", function() {\r",
+							"    pm.response.to.be.ok;\r",
+							"    pm.response.to.json;\r",
+							"    pm.response.to.be.withBody;\r",
+							"});\r",
+							"\r",
+							"var result = pm.response.json();\r",
+							"\r",
+							"pm.test(\"Checar Id Chamado\", function() {\r",
+							"    pm.expect(result.id).not.undefined;\r",
+							"    pm.expect(result.id).not.null;\r",
+							"    pm.expect(result.id).to.eql(pm.collectionVariables.get(\"idChamado\"));\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Checar Data Chamado\", function() {\r",
+							"    pm.expect(result.dataChamado).not.undefined;\r",
+							"    pm.expect(result.dataChamado).not.null;\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Checar E-mail\", function() {\r",
+							"    pm.expect(result.email).to.eql(pm.collectionVariables.get(\"email\"));\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Checar Descritivo Chamado\", function() {\r",
+							"    pm.expect(result.descritivoRequisicao).to.eql(pm.collectionVariables.get(\"descritivoRequisicao\"));\r",
+							"});\r",
+							"\r",
+							"pm.test(\"Checar Status Chamado\", function() {\r",
+							"    pm.expect(result.solucionado).not.undefined;\r",
+							"    pm.expect(result.solucionado).not.null;\r",
+							"    pm.expect(result.solucionado).to.eql(false);\r",
+							"});"
+						],
+						"type": "text/javascript"
+					}
+				}
+			],
+			"request": {
+				"method": "GET",
+				"header": [],
+				"url": {
+					"raw": "http://localhost:5000/Suporte/{{idChamado}}",
+					"protocol": "http",
+					"host": [
+						"localhost"
+					],
+					"port": "5000",
+					"path": [
+						"Suporte",
+						"{{idChamado}}"
+					]
+				}
+			},
+			"response": []
+		}
+	],
+	"event": [
+		{
+			"listen": "prerequest",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		},
+		{
+			"listen": "test",
+			"script": {
+				"type": "text/javascript",
+				"exec": [
+					""
+				]
+			}
+		}
+	],
+	"variable": [
+		{
+			"key": "email",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "descritivoRequisicao",
+			"value": "",
+			"type": "string"
+		},
+		{
+			"key": "idChamado",
+			"value": "",
+			"type": "string"
+		}
+	]
+}

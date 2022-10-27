@@ -1,0 +1,1 @@
+docker build . -t groffeazuredevops.azurecr.io/apisuportemongodb:dev --no-cache

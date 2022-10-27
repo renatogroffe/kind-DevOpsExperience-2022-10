@@ -1,0 +1,172 @@
+trigger:
+- main
+
+resources:
+- repo: self
+
+variables:
+
+  # Container registry service connection established during pipeline creation
+  dockerRegistryServiceConnection: 'CONNECTION AZURE CONTAINER REGISTRY'
+  imageRepository: 'apisuportemongok8s'
+  containerRegistry: 'resource.azurecr.io'
+  dockerfilePath: '**/Dockerfile'
+  tag: '$(Build.BuildId)'
+  imagePullSecret: 'resource-auth'
+
+  # Agent VM image name
+  vmImageName: 'ubuntu-latest'
+
+  Path_YAMLIntegrationTests: './AutomationEnvironment'
+  Path_Tests: './Tests'
+  Collection_Postman: 'ChamadosSuporteMongoDB.postman_collection.json'
+  Iterations: 10
+
+stages:
+- stage: BuildAndTests
+  displayName: Build and Tests stage
+  jobs:
+  - job: BuildAndTests
+    displayName: BuildAndTests
+    pool:
+      vmImage: $(vmImageName)
+    steps:
+    - task: Docker@2
+      displayName: Build da imagem
+      inputs:
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+        repository: '$(imageRepository)'
+        command: 'build'
+        Dockerfile: '**/Dockerfile'
+        tags: |
+          $(tag)
+          latest
+    - task: replacetokens@5
+      displayName: Acertar tag da imagem no arquivo YAML de Deployment local
+      inputs:
+        targetFiles: '**/AutomationEnvironment/deployment-automation-env.yml'
+        encoding: 'auto'
+        tokenPattern: 'default'
+        writeBOM: true
+        actionOnMissing: 'warn'
+        keepToken: false
+        actionOnNoFiles: 'continue'
+        enableTransforms: false
+        enableRecursion: false
+        useLegacyPattern: false
+        defaultValue: '$(containerRegistry)/$(imageRepository):$(tag)'
+        enableTelemetry: true
+    - script: cat '$(Path_YAMLIntegrationTests)/deployment-automation-env.yml'
+      displayName: Exibir conteúdo do arquivo YAML de Deployment local
+    - script: |
+        kind
+        cd $(Path_YAMLIntegrationTests)
+        kind create cluster --name kind-01 --config=kind-cluster-config-automation-env.yaml
+        echo ' '
+        echo 'Cluster Kubernetes local em funcionamento...'
+        echo ' '
+        kubectl get services
+      displayName: Criar cluster Kubernetes local com kind
+    - script: docker container ls
+      displayName: Exibir containers em execução
+    - script: kind load docker-image $(containerRegistry)/$(imageRepository):$(tag) --name kind-01
+      # Documentação: https://kind.sigs.k8s.io/docs/user/quick-start/#loading-an-image-into-your-cluster
+      displayName: Carregar imagem para testes no cluster local (kind)
+    - script: |
+        kubectl create namespace integrationtests
+        kubectl get namespaces
+      displayName: Criar namespace integrationtests
+    - script: |
+        cd $(Path_YAMLIntegrationTests)
+        kubectl apply -f secret-automation-env.yml -n integrationtests
+        kubectl apply -f deployment-automation-env-mongodb.yml -n integrationtests
+        kubectl get all -n integrationtests
+        echo ' '
+        echo 'Aguardando a inicialização dos serviços no cluster (40 segundos)...'
+        echo ' '
+        sleep 40s
+        kubectl apply -f deployment-automation-env.yml -n integrationtests
+        kubectl get all -n integrationtests
+        echo ' '
+        echo 'Aguardando a inicialização dos serviços no cluster (10 segundos)...'
+        echo ' '
+        sleep 10s
+        kubectl get all -n integrationtests
+      displayName: Deployment do ambiente de testes no namespace integrationtests
+    - script: |
+        echo "** Versão Global do Newman **"
+        newman -v
+        npm install newman-reporter-htmlextra@1.22.11
+        npm install newman-reporter-junitfullreport@1.0.4
+      displayName: Instalar packages newman-reporter-htmlextra e newman-reporter-junitfullreport
+      condition: always() 
+    - script: |
+        cd $(Path_Tests)
+        npx newman run $(Collection_Postman) -n $(Iterations) -r cli,htmlextra,junitfullreport
+      displayName: Executar testes da API REST com Newman
+      condition: always() 
+    - script: |
+        cd $(Path_Tests)/newman
+        ls
+      displayName: Listar arquivos gerados após testes da API REST com Newman
+      condition: always() 
+    - task: PublishTestResults@2
+      inputs:
+        testResultsFormat: 'JUnit'
+        testResultsFiles: '**/newman/*.xml'
+        searchFolder: '$(Build.SourcesDirectory)'
+      displayName: Publicar sumário dos testes com base no XML gerado
+      condition: always()
+    - task: UploadPostmanHtmlReport@1
+      displayName: Publicar relatório em HTML com resultados dos testes da API REST com Newman
+      inputs:
+        cwd: '$(System.DefaultWorkingDirectory)/$(Path_Tests)'
+      condition: always()
+    - script: kubectl logs deploy/testes-apisuporte -c apisuporte -n integrationtests
+      displayName: Exibir log de execução da aplicação testada
+      condition: always()
+    - task: Docker@2
+      displayName: Push da imagem no Azure Container Registry (ACR)
+      inputs:
+        containerRegistry: '$(dockerRegistryServiceConnection)'
+        repository: '$(imageRepository)'
+        command: 'push'
+        tags: |
+          $(tag)
+          latest
+
+    - upload: manifests
+      artifact: manifests
+
+- stage: Deploy
+  displayName: Deploy stage
+  dependsOn: BuildAndTests
+
+  jobs:
+  - deployment: Deploy
+    displayName: Deploy
+    pool:
+      vmImage: $(vmImageName)
+    environment: 'Suporte.suporte'
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+          - task: KubernetesManifest@0
+            displayName: Create imagePullSecret
+            inputs:
+              action: createSecret
+              secretName: $(imagePullSecret)
+              dockerRegistryEndpoint: $(dockerRegistryServiceConnection)
+
+          - task: KubernetesManifest@0
+            displayName: Deploy to Kubernetes cluster
+            inputs:
+              action: deploy
+              manifests: |
+                $(Pipeline.Workspace)/manifests/deployment.yml
+                $(Pipeline.Workspace)/manifests/service.yml
+              imagePullSecrets: |
+                $(imagePullSecret)
+              containers: |
+                $(containerRegistry)/$(imageRepository):$(tag)

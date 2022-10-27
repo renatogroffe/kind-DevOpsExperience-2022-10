@@ -1,0 +1,44 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: testes-apisuporte
+spec:
+  selector:
+    matchLabels:
+      app: testes-apisuporte
+  replicas: 1
+  template:
+    metadata:
+      labels:
+        app: testes-apisuporte
+    spec:
+      containers:
+        - name: apisuporte
+          image: groffeazuredevops.azurecr.io/apisuportemongodb:dev
+          imagePullPolicy: Never
+          env:
+          - name: ConnectionStrings__MongoDB
+            valueFrom:
+              secretKeyRef:
+                name: apisuportesecret
+                key: ConnectionMongoDB
+          - name: MongoDB__Database
+            value: DBChamadosDev
+          - name: MongoDB__Collection
+            value: ChamadosSuporteDev
+          ports:
+          - containerPort: 80
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: testes-apisuporte-service
+spec:
+  selector:
+    app: testes-apisuporte
+  ports:
+    - name: apisuporte
+      port: 5000
+      targetPort: 80
+      nodePort: 30080
+  type: NodePort

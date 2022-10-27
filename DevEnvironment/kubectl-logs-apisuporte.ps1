@@ -1,0 +1,1 @@
+kubectl logs deploy/testes-apisuporte -c apisuporte -n integration-tests

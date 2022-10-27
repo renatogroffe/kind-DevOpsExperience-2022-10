@@ -1,0 +1,29 @@
+apiVersion : apps/v1
+kind: Deployment
+metadata:
+  name: apisuportemongok8s 
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: apisuportemongok8s
+  template:
+    metadata:
+      labels:
+        app: apisuportemongok8s 
+    spec:
+      containers:
+        - name: apisuportemongok8s 
+          image: resource.azurecr.io/apisuportemongok8s
+          env:
+          - name: ConnectionStrings__MongoDB
+            valueFrom:
+              secretKeyRef:
+                name: apisuportesecret
+                key: ConnectionMongoDB
+          - name: MongoDB__Database
+            value: DBChamadosProd
+          - name: MongoDB__Collection
+            value: ChamadosSuporteProd
+          ports:
+          - containerPort: 80
